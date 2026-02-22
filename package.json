@@ -1,0 +1,8 @@
+{
+  "name": "skillgap-ai",
+  "version": "1.0.0",
+  "description": "AI-powered resume skill gap analyser",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
