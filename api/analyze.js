@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -32,11 +32,7 @@ Return ONLY this JSON structure, nothing else:
       "priority": "High"
     }
   ],
-  "tips": [
-    "Tip 1",
-    "Tip 2",
-    "Tip 3"
-  ]
+  "tips": ["Tip 1", "Tip 2", "Tip 3"]
 }
 
 RESUME:
@@ -64,38 +60,33 @@ ${jobDescription}`;
 
     const geminiData = await geminiResponse.json();
 
-    // If API call itself failed
     if (!geminiResponse.ok) {
-      return res.status(500).json({ 
-        error: geminiData.error?.message || 'Gemini API error',
-        debug: geminiData 
+      return res.status(500).json({
+        error: geminiData.error?.message || 'Gemini API error'
       });
     }
 
-    // Check structure exists
     if (!geminiData.candidates || !geminiData.candidates[0]) {
-      return res.status(500).json({ 
-        error: 'No response from Gemini',
-        debug: JSON.stringify(geminiData)
+      return res.status(500).json({
+        error: 'No candidates in response',
+        debug: JSON.stringify(geminiData).substring(0, 300)
       });
     }
 
     let content = geminiData.candidates[0].content.parts[0].text.trim();
 
-    // Strip all possible markdown
+    // Strip markdown if present
     content = content
       .replace(/^```json\n?/i, '')
       .replace(/^```\n?/i, '')
       .replace(/\n?```$/i, '')
       .trim();
 
-    // Try parsing
     try {
       const result = JSON.parse(content);
       return res.status(200).json(result);
     } catch (e) {
-      // Return raw content so we can see what Gemini actually sent
-      return res.status(500).json({ 
+      return res.status(500).json({
         error: 'JSON parse failed',
         rawContent: content.substring(0, 500)
       });
