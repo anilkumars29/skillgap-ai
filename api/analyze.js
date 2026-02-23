@@ -12,31 +12,30 @@ export default async function handler(req, res) {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured. Please add GEMINI_API_KEY in Vercel environment variables.' });
+    return res.status(500).json({ error: 'API key not configured.' });
   }
 
-  const prompt = `You are an expert career coach and ATS specialist. Analyse the resume against the job description and return a JSON object.
+  const prompt = `You are an expert career coach. Analyse the resume against the job description.
 
-IMPORTANT: Return ONLY raw JSON. No markdown, no backticks, no code blocks, no explanation. Start directly with { and end with }.
+Return ONLY this JSON structure, nothing else:
 
 {
-  "matchScore": <number 0-100>,
-  "verdict": "<one sentence verdict>",
+  "matchScore": 75,
+  "verdict": "Your verdict here",
   "matchedSkills": ["skill1", "skill2"],
   "missingSkills": ["skill1", "skill2"],
   "roadmap": [
     {
-      "skill": "<skill name>",
-      "why": "<why this skill matters for this job>",
-      "resource": "<specific free resource to learn this>",
-      "priority": "<High | Medium | Low>"
+      "skill": "Skill Name",
+      "why": "Why it matters",
+      "resource": "Free resource to learn",
+      "priority": "High"
     }
   ],
   "tips": [
-    "<actionable resume tip 1>",
-    "<actionable resume tip 2>",
-    "<actionable resume tip 3>",
-    "<actionable resume tip 4>"
+    "Tip 1",
+    "Tip 2",
+    "Tip 3"
   ]
 }
 
@@ -55,7 +54,7 @@ ${jobDescription}`;
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.3,
+            temperature: 0.2,
             maxOutputTokens: 2000,
             responseMimeType: "application/json"
           }
@@ -63,41 +62,46 @@ ${jobDescription}`;
       }
     );
 
+    const geminiData = await geminiResponse.json();
+
+    // If API call itself failed
     if (!geminiResponse.ok) {
-      const errData = await geminiResponse.json();
-      throw new Error(errData.error?.message || 'Gemini API error');
+      return res.status(500).json({ 
+        error: geminiData.error?.message || 'Gemini API error',
+        debug: geminiData 
+      });
     }
 
-    const geminiData = await geminiResponse.json();
+    // Check structure exists
+    if (!geminiData.candidates || !geminiData.candidates[0]) {
+      return res.status(500).json({ 
+        error: 'No response from Gemini',
+        debug: JSON.stringify(geminiData)
+      });
+    }
+
     let content = geminiData.candidates[0].content.parts[0].text.trim();
 
-    // Aggressively strip any markdown formatting Gemini might add
+    // Strip all possible markdown
     content = content
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
+      .replace(/^```json\n?/i, '')
+      .replace(/^```\n?/i, '')
+      .replace(/\n?```$/i, '')
       .trim();
 
-    // Parse JSON safely
-    let result;
+    // Try parsing
     try {
-      result = JSON.parse(content);
-    } catch (parseErr) {
-      // Last resort — extract anything that looks like JSON
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
-      } else {
-        // Log actual content for debugging
-        console.error('Raw Gemini response:', content);
-        throw new Error('Failed to parse AI response. Please try again.');
-      }
+      const result = JSON.parse(content);
+      return res.status(200).json(result);
+    } catch (e) {
+      // Return raw content so we can see what Gemini actually sent
+      return res.status(500).json({ 
+        error: 'JSON parse failed',
+        rawContent: content.substring(0, 500)
+      });
     }
 
-    return res.status(200).json(result);
-
   } catch (err) {
-    console.error('Analysis error:', err.message);
-    return res.status(500).json({ error: err.message || 'Analysis failed. Please try again.' });
+    return res.status(500).json({ error: err.message });
   }
 }
