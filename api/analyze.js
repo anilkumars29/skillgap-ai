@@ -15,7 +15,7 @@ module.exports = async function handler(req, res) {
   }
 
   const prompt = `You are an expert career coach. Analyse the resume against the job description.
-Return ONLY valid JSON, no markdown, no explanation, just JSON.
+Return ONLY valid JSON, no markdown, no explanation, just JSON starting with { and ending with }.
 
 {
   "matchScore": 75,
@@ -41,7 +41,7 @@ ${jobDescription}`;
 
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,61 +63,40 @@ ${jobDescription}`;
       });
     }
 
-    // Log full structure to see what we're getting
-    console.log('Gemini full response:', JSON.stringify(geminiData).substring(0, 1000));
+    let content = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    const candidate = geminiData?.candidates?.[0];
-    if (!candidate) {
+    if (!content) {
       return res.status(500).json({
-        error: 'No candidate returned',
-        fullResponse: JSON.stringify(geminiData).substring(0, 500)
+        error: 'Empty response from Gemini',
+        full: JSON.stringify(geminiData).substring(0, 300)
       });
     }
 
-    const part = candidate?.content?.parts?.[0];
-    if (!part) {
-      return res.status(500).json({
-        error: 'No parts in candidate',
-        candidate: JSON.stringify(candidate).substring(0, 500)
-      });
-    }
+    content = content.trim();
 
-    let content = part.text.trim();
-    console.log('Raw content:', content.substring(0, 500));
-
-    // Aggressively clean
+    // Strip markdown code blocks
     content = content
       .replace(/^```json\s*/i, '')
       .replace(/^```\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
 
-    try {
-      const result = JSON.parse(content);
-      return res.status(200).json(result);
-    } catch (e) {
-      // Extract JSON between first { and last }
-      const start = content.indexOf('{');
-      const end = content.lastIndexOf('}');
-      if (start !== -1 && end !== -1) {
-        try {
-          const result = JSON.parse(content.substring(start, end + 1));
-          return res.status(200).json(result);
-        } catch(e2) {
-          return res.status(500).json({
-            error: 'JSON parse failed',
-            rawContent: content.substring(0, 800)
-          });
-        }
-      }
+    // Extract JSON between first { and last }
+    const start = content.indexOf('{');
+    const end = content.lastIndexOf('}');
+
+    if (start === -1 || end === -1) {
       return res.status(500).json({
-        error: 'No JSON found',
-        rawContent: content.substring(0, 800)
+        error: 'No JSON found in response',
+        raw: content.substring(0, 300)
       });
     }
 
+    const jsonString = content.substring(start, end + 1);
+    const result = JSON.parse(jsonString);
+    return res.status(200).json(result);
+
   } catch (err) {
-    console.error('Handler error:', err);
     return res.status(500).json({ error: err.message });
   }
 }
