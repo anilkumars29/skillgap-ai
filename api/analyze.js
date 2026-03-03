@@ -9,7 +9,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Resume and job description are required.' });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: 'API key not configured.' });
   }
@@ -52,45 +52,46 @@ JOB DESCRIPTION:
 ${jobDescription}`;
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are a career coach. Always respond with valid JSON only. No markdown, no code blocks, just pure JSON.' 
-          },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-        max_tokens: 2000
-      })
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 2000
+          }
+        })
+      }
+    );
 
     const rawText = await response.text();
-    console.log('OpenAI status:', response.status);
-    console.log('Raw first 300:', rawText.substring(0, 300));
+    console.log('Status:', response.status);
+    console.log('Raw:', rawText.substring(0, 500));
 
     let data;
     try {
       data = JSON.parse(rawText);
     } catch(e) {
-      return res.status(500).json({ error: 'OpenAI returned non-JSON: ' + rawText.substring(0, 200) });
+      return res.status(500).json({ error: 'Gemini returned non-JSON: ' + rawText.substring(0, 200) });
     }
 
     if (!response.ok) {
-      return res.status(500).json({ error: data.error?.message || 'OpenAI API error' });
+      return res.status(500).json({ error: data.error?.message || 'Gemini API error' });
     }
 
-    let content = data.choices?.[0]?.message?.content;
+    let content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!content) {
-      return res.status(500).json({ error: 'No content returned', full: JSON.stringify(data).substring(0, 300) });
+      return res.status(500).json({
+        error: 'No content in response',
+        full: JSON.stringify(data).substring(0, 400)
+      });
     }
+
+    console.log('Content:', content.substring(0, 300));
 
     content = content
       .replace(/^```json\s*/i, '')
@@ -102,7 +103,7 @@ ${jobDescription}`;
     const end = content.lastIndexOf('}');
 
     if (start === -1 || end === -1) {
-      return res.status(500).json({ error: 'No JSON found', raw: content.substring(0, 300) });
+      return res.status(500).json({ error: 'No JSON found', raw: content.substring(0, 400) });
     }
 
     const result = JSON.parse(content.substring(start, end + 1));
