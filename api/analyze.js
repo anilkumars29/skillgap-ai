@@ -39,7 +39,7 @@ Return ONLY valid JSON with no markdown or code blocks, starting with { and endi
 }
 
 Rules:
-- matchScore: 0-100 based on how well resume matches JD
+- matchScore: 0-100 based on how well resume matches JD, use precise numbers like 67 or 83, do NOT round to multiples of 10, use precise numbers like 67 or 83, do NOT round to multiples of 10
 - matchedSkills: skills in BOTH resume and JD
 - missingSkills: skills required by JD but NOT in resume
 - roadmap: max 8 items, High priority first
