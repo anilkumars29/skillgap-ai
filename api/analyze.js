@@ -39,9 +39,9 @@ Return ONLY valid JSON with no markdown or code blocks, starting with { and endi
 }
 
 Rules:
-- matchScore: 0-100 based on how well resume matches JD, use precise numbers like 67 or 83, do NOT round to multiples of 10, use precise numbers like 67 or 83, do NOT round to multiples of 10
-- matchedSkills: skills in BOTH resume and JD
-- missingSkills: skills required by JD but NOT in resume
+- matchScore: Calculate strictly using this formula — (matchedSkills count / total required skills in JD) * 100, then adjust by max +10 for relevant experience or education. Example: 3 matched out of 9 required = 33, not 70. Be honest and strict, do NOT inflate the score. Use precise numbers, do NOT round to multiples of 10.
+- matchedSkills: skills explicitly present in BOTH resume and JD only, no implied or vague matches
+- missingSkills: all skills required by JD but NOT explicitly in resume, be thorough
 - roadmap: max 8 items, High priority first
 - tips: specific to THIS job, not generic advice
 
