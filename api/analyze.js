@@ -108,6 +108,7 @@ ${jobDescription}`;
     }
 
     const result = JSON.parse(content.substring(start, end + 1));
+    if (result.matchScore !== undefined) result.matchScore = Math.round(result.matchScore);
     return res.status(200).json(result);
 
   } catch (err) {
